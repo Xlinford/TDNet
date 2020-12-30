@@ -17,8 +17,9 @@ from ptsemseg.utils import get_logger
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.augmentations import get_composed_augmentations
 from ptsemseg.optimizers import get_optimizer
-from ptsemseg.utils import convert_state_dict,clean_state_dict
+from ptsemseg.utils import convert_state_dict, clean_state_dict
 import pdb
+
 
 def init_seed(manual_seed, en_cudnn=False):
     '''
@@ -29,6 +30,7 @@ def init_seed(manual_seed, en_cudnn=False):
     torch.cuda.manual_seed(manual_seed)
     np.random.seed(manual_seed)
     random.seed(manual_seed)
+
 
 def train(cfg, logger, logdir):
     # Setup seeds
@@ -47,27 +49,40 @@ def train(cfg, logger, logdir):
     data_loader = get_loader(cfg["data"]["dataset"])
     data_path = cfg["data"]["path"]
 
-    t_loader = data_loader(data_path,split=cfg["data"]["train_split"],augmentations=t_data_aug,path_num=path_n)
-    v_loader = data_loader(data_path,split=cfg["data"]["val_split"],augmentations=v_data_aug,path_num=path_n)
+    t_loader = data_loader(
+        data_path,
+        split=cfg["data"]["train_split"],
+        augmentations=t_data_aug,
+        path_num=path_n)
+    v_loader = data_loader(
+        data_path,
+        split=cfg["data"]["val_split"],
+        augmentations=v_data_aug,
+        path_num=path_n)
 
     trainloader = data.DataLoader(t_loader,
                                   batch_size=cfg["training"]["batch_size"],
                                   num_workers=cfg["training"]["n_workers"],
                                   shuffle=True,
-                                  drop_last=True  )
+                                  drop_last=True)
     valloader = data.DataLoader(v_loader,
                                 batch_size=cfg["validating"]["batch_size"],
-                                num_workers=cfg["validating"]["n_workers"] )
+                                num_workers=cfg["validating"]["n_workers"])
 
     logger.info("Using training seting {}".format(cfg["training"]))
-    
+
     # Setup Metrics
     running_metrics_val = runningScore(t_loader.n_classes)
 
     # Setup Model and Loss
     loss_fn = get_loss_function(cfg["training"])
     teacher = get_model(cfg["teacher"], t_loader.n_classes)
-    model = get_model(cfg["model"],t_loader.n_classes, loss_fn, cfg["training"]["resume"],teacher)
+    model = get_model(
+        cfg["model"],
+        t_loader.n_classes,
+        loss_fn,
+        cfg["training"]["resume"],
+        teacher)
     logger.info("Using loss {}".format(loss_fn))
 
     # Setup optimizer
@@ -76,7 +91,7 @@ def train(cfg, logger, logdir):
     # Setup Multi-GPU
     model = DataParallelModel(model).cuda()
 
-    #Initialize training param
+    # Initialize training param
     cnt_iter = 0
     best_iou = 0.0
     time_meter = averageMeter()
@@ -88,7 +103,7 @@ def train(cfg, logger, logdir):
             optimizer.zero_grad()
 
             start_ts = time.time()
-            outputs = model(f_img,labels,pos_id=cnt_iter%path_n)
+            outputs = model(f_img, labels, pos_id=cnt_iter % path_n)
 
             seg_loss = gather(outputs, 0)
             seg_loss = torch.mean(seg_loss)
@@ -101,23 +116,25 @@ def train(cfg, logger, logdir):
             if (cnt_iter + 1) % cfg["training"]["print_interval"] == 0:
                 fmt_str = "Iter [{:d}/{:d}]  Loss: {:.4f}  Time/Image: {:.4f}"
                 print_str = fmt_str.format(
-                                            cnt_iter + 1,
-                                            cfg["training"]["train_iters"],
-                                            seg_loss.item(),
-                                            time_meter.avg / cfg["training"]["batch_size"], )
+                    cnt_iter + 1,
+                    cfg["training"]["train_iters"],
+                    seg_loss.item(),
+                    time_meter.avg / cfg["training"]["batch_size"], )
 
                 print(print_str)
                 logger.info(print_str)
                 time_meter.reset()
 
-            if (cnt_iter + 1) % cfg["training"]["val_interval"] == 0 or (cnt_iter + 1) == cfg["training"]["train_iters"]:
+            if (cnt_iter + 1) % cfg["training"]["val_interval"] == 0 or (
+                    cnt_iter + 1) == cfg["training"]["train_iters"]:
                 model.eval()
                 with torch.no_grad():
-                    for i_val, (f_img_val, labels_val) in tqdm(enumerate(valloader)):
-                        
-                        outputs = model(f_img_val,pos_id=i_val%path_n)
+                    for i_val, (f_img_val, labels_val) in tqdm(
+                            enumerate(valloader)):
+
+                        outputs = model(f_img_val, pos_id=i_val % path_n)
                         outputs = gather(outputs, 0, dim=0)
-                        
+
                         pred = outputs.data.max(1)[1].cpu().numpy()
                         gt = labels_val.data.cpu().numpy()
 
@@ -137,12 +154,13 @@ def train(cfg, logger, logdir):
                     best_iou = score["Mean IoU : \t"]
                     state = {
                         "epoch": cnt_iter + 1,
-                        "model_state": clean_state_dict(model.module.state_dict(),'teacher'),
+                        "model_state": clean_state_dict(model.module.state_dict(), 'teacher'),
                         "best_iou": best_iou,
                     }
                     save_path = os.path.join(logdir,
-                        "{}_{}_best_model.pkl".format(cfg["model"]["arch"], cfg["data"]["dataset"]),
-                    )
+                                             "{}_{}_best_model.pkl".format(
+                                                 cfg["model"]["arch"], cfg["data"]["dataset"]),
+                                             )
                     torch.save(state, save_path)
 
 
@@ -163,8 +181,12 @@ if __name__ == "__main__":
         cfg = yaml.safe_load(fp)
 
     run_id = random.randint(1, 100000)
-    logdir = os.path.join("runs", os.path.basename(args.config)[:-4], str(run_id))
-    if not os.path.exists(os.path.join("runs", os.path.basename(args.config)[:-4])):
+    logdir = os.path.join(
+        "runs", os.path.basename(
+            args.config)[
+            :-4], str(run_id))
+    if not os.path.exists(os.path.join(
+            "runs", os.path.basename(args.config)[:-4])):
         os.mkdir(os.path.join("runs", os.path.basename(args.config)[:-4]))
 
     os.mkdir(logdir)

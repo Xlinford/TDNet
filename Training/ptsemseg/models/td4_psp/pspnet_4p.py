@@ -2,14 +2,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import os
-from .resnet import resnet50,resnet101,resnet152
-import pdb
+from .resnet import resnet50, resnet101, resnet152
 import logging
-from ptsemseg.utils import split_psp_state_dict,convert_state_dict
+from ptsemseg.utils import split_psp_state_dict, convert_state_dict
 
 logger = logging.getLogger("ptsemseg")
 
 up_kwargs = {'mode': 'bilinear', 'align_corners': True}
+
 
 class pspnet_4p(nn.Module):
 
@@ -28,19 +28,19 @@ class pspnet_4p(nn.Module):
     """
 
     def __init__(self,
-            nclass=21,
-            se_loss=None,
-            norm_layer=nn.BatchNorm2d,
-            backbone='resnet101',
-            root='~/.encoding/models',
-            dilated=True,
-            aux=True,
-            multi_grid=True,
-            fixed=True,
-            loss_fn=None,
-            teacher_model=None,
-            path_num=None
-        ):
+                 nclass=21,
+                 se_loss=None,
+                 norm_layer=nn.BatchNorm2d,
+                 backbone='resnet101',
+                 root='~/.encoding/models',
+                 dilated=True,
+                 aux=True,
+                 multi_grid=True,
+                 fixed=True,
+                 loss_fn=None,
+                 teacher_model=None,
+                 path_num=None
+                 ):
         super(pspnet_4p, self).__init__()
 
         self.path_num = path_num
@@ -54,26 +54,25 @@ class pspnet_4p(nn.Module):
         # copying modules from pretrained models
         self.backbone = backbone
         if backbone == 'resnet50':
-            self.pretrained = resnet50(pretrained=True, dilated=dilated,multi_grid=multi_grid,
-                                              norm_layer=norm_layer, root=root)
+            self.pretrained = resnet50(pretrained=True, dilated=dilated, multi_grid=multi_grid,
+                                       norm_layer=norm_layer, root=root)
         elif backbone == 'resnet101':
-            self.pretrained = resnet101(pretrained=True, dilated=dilated,multi_grid=multi_grid,
-                                               norm_layer=norm_layer, root=root)
+            self.pretrained = resnet101(pretrained=True, dilated=dilated, multi_grid=multi_grid,
+                                        norm_layer=norm_layer, root=root)
         elif backbone == 'resnet152':
-            self.pretrained = resnet152(pretrained=True, dilated=dilated,multi_grid=multi_grid,
-                                               norm_layer=norm_layer, root=root)
+            self.pretrained = resnet152(pretrained=True, dilated=dilated, multi_grid=multi_grid,
+                                        norm_layer=norm_layer, root=root)
         else:
             raise RuntimeError('unknown backbone: {}'.format(backbone))
         # bilinear upsample options
-        
-        #self.head = PSPHead(2048, nclass, norm_layer, self._up_kwargs)
 
+        # self.head = PSPHead(2048, nclass, norm_layer, self._up_kwargs)
 
-        self.psp1 =  PyramidPooling(2048, norm_layer, self._up_kwargs, path_num=self.path_num, pid=0)
-        self.psp2 =  PyramidPooling(2048, norm_layer, self._up_kwargs, path_num=self.path_num, pid=1)
-        self.psp3 =  PyramidPooling(2048, norm_layer, self._up_kwargs, path_num=self.path_num, pid=2)
-        self.psp4 =  PyramidPooling(2048, norm_layer, self._up_kwargs, path_num=self.path_num, pid=3)
-    
+        self.psp1 = PyramidPooling(2048, norm_layer, self._up_kwargs, path_num=self.path_num, pid=0)
+        self.psp2 = PyramidPooling(2048, norm_layer, self._up_kwargs, path_num=self.path_num, pid=1)
+        self.psp3 = PyramidPooling(2048, norm_layer, self._up_kwargs, path_num=self.path_num, pid=2)
+        self.psp4 = PyramidPooling(2048, norm_layer, self._up_kwargs, path_num=self.path_num, pid=3)
+
         self.group1 = ConvBNReLU(1024, 512, norm_layer, ksize=3, pad=1, BNLU=False)
         self.group2 = ConvBNReLU(1024, 512, norm_layer, ksize=3, pad=1, BNLU=False)
         self.group3 = ConvBNReLU(1024, 512, norm_layer, ksize=3, pad=1, BNLU=False)
@@ -83,10 +82,10 @@ class pspnet_4p(nn.Module):
 
         self.pretrained_init()
 
-    def forward(self, x,test_mod=False):
+    def forward(self, x, test_mod=False):
         _, _, h, w = x.size()
 
-        c4 = self.pretrained(x,aux=False)
+        c4 = self.pretrained(x, aux=False)
         p1 = self.psp1(c4)
         p2 = self.psp2(c4)
         p3 = self.psp3(c4)
@@ -95,21 +94,26 @@ class pspnet_4p(nn.Module):
         g2 = self.group2(p2)
         g3 = self.group3(p3)
         g4 = self.group4(p4)
-        out12 = self.head(g1+g2+g3+g4)
-        out1 = self.head(g1+g1+g1+g1)
-        out2 = self.head(g2+g2+g2+g2)
-        out3 = self.head(g3+g3+g3+g3)
-        out4 = self.head(g4+g4+g4+g4)
+        out12 = self.head(g1 + g2 + g3 + g4)
+        out1 = self.head(g1 + g1 + g1 + g1)
+        out2 = self.head(g2 + g2 + g2 + g2)
+        out3 = self.head(g3 + g3 + g3 + g3)
+        out4 = self.head(g4 + g4 + g4 + g4)
         return out12, out1, out3, out2, out4
 
     def pretrained_init(self):
 
         if self.teacher_model is not None:
             if os.path.isfile(self.teacher_model):
-                logger.info("Initializing Teacher with pretrained '{}'".format(self.teacher_model))
-                print("Initializing Teacher with pretrained '{}'".format(self.teacher_model))
+                logger.info(
+                    "Initializing Teacher with pretrained '{}'".format(
+                        self.teacher_model))
+                print(
+                    "Initializing Teacher with pretrained '{}'".format(
+                        self.teacher_model))
                 model_state = torch.load(self.teacher_model)
-                backbone_state, psp_state, grp_state1, grp_state2, grp_state3, grp_state4, head_state, auxlayer_state = split_psp_state_dict(model_state,self.path_num)
+                backbone_state, psp_state, grp_state1, grp_state2, grp_state3, grp_state4, head_state, auxlayer_state = split_psp_state_dict(
+                    model_state, self.path_num)
                 self.pretrained.load_state_dict(backbone_state, strict=True)
                 self.psp1.load_state_dict(psp_state, strict=True)
                 self.psp2.load_state_dict(psp_state, strict=True)
@@ -121,15 +125,13 @@ class pspnet_4p(nn.Module):
                 self.group4.load_state_dict(grp_state4, strict=True)
                 self.head.load_state_dict(head_state, strict=True)
             else:
-                logger.info("No pretrained found at '{}'".format(self.teacher_model))
-        
+                logger.info(
+                    "No pretrained found at '{}'".format(
+                        self.teacher_model))
+
             if self.fixed:
                 for param in self.parameters():
                     param.requires_grad = False
-
-
-
-
 
 
 class PyramidPooling(nn.Module):
@@ -138,7 +140,8 @@ class PyramidPooling(nn.Module):
         Zhao, Hengshuang, et al. *"Pyramid scene parsing network."*
     """
 
-    def __init__(self, in_channels, norm_layer, up_kwargs, path_num=None, pid=None):
+    def __init__(self, in_channels, norm_layer,
+                 up_kwargs, path_num=None, pid=None):
         super(PyramidPooling, self).__init__()
         self.norm_layer = norm_layer
         self.pid = pid
@@ -166,21 +169,33 @@ class PyramidPooling(nn.Module):
 
     def forward(self, x):
         n, c, h, w = x.size()
-        feat1 = F.interpolate(self.conv1(self.pool1(x)), (h, w), **self._up_kwargs)
-        feat2 = F.interpolate(self.conv2(self.pool2(x)), (h, w), **self._up_kwargs)
-        feat3 = F.interpolate(self.conv3(self.pool3(x)), (h, w), **self._up_kwargs)
-        feat4 = F.interpolate(self.conv4(self.pool4(x)), (h, w), **self._up_kwargs)
+        feat1 = F.interpolate(self.conv1(self.pool1(x)),
+                              (h, w), **self._up_kwargs)
+        feat2 = F.interpolate(self.conv2(self.pool2(x)),
+                              (h, w), **self._up_kwargs)
+        feat3 = F.interpolate(self.conv3(self.pool3(x)),
+                              (h, w), **self._up_kwargs)
+        feat4 = F.interpolate(self.conv4(self.pool4(x)),
+                              (h, w), **self._up_kwargs)
 
-        x = x[:, self.pid*c//self.path_num:(self.pid+1)*c//self.path_num]
-        feat1 = feat1[:, self.pid*c//(self.path_num*4):(self.pid+1)*c//(self.path_num*4)]
-        feat2 = feat2[:, self.pid*c//(self.path_num*4):(self.pid+1)*c//(self.path_num*4)]
-        feat3 = feat3[:, self.pid*c//(self.path_num*4):(self.pid+1)*c//(self.path_num*4)]
-        feat4 = feat4[:, self.pid*c//(self.path_num*4):(self.pid+1)*c//(self.path_num*4)]
+        x = x[:, self.pid * c //
+              self.path_num:(self.pid + 1) * c // self.path_num]
+
+        feat1 = feat1[:, self.pid * c //
+                      (self.path_num * 4):(self.pid + 1) * c // (self.path_num * 4)]
+        feat2 = feat2[:, self.pid * c //
+                      (self.path_num * 4):(self.pid + 1) * c // (self.path_num * 4)]
+        feat3 = feat3[:, self.pid * c //
+                      (self.path_num * 4):(self.pid + 1) * c // (self.path_num * 4)]
+        feat4 = feat4[:, self.pid * c //
+                      (self.path_num * 4):(self.pid + 1) * c // (self.path_num * 4)]
 
         return torch.cat((x, feat1, feat2, feat3, feat4), 1)
 
+
 class ConvBNReLU(nn.Module):
-    def __init__(self, in_channels, out_channels, norm_layer, ksize=3, pad=1, BNLU=False):
+    def __init__(self, in_channels, out_channels,
+                 norm_layer, ksize=3, pad=1, BNLU=False):
         super(ConvBNReLU, self).__init__()
         self.norm_layer = norm_layer
         if BNLU:
@@ -188,7 +203,13 @@ class ConvBNReLU(nn.Module):
                                        norm_layer(out_channels),
                                        nn.ReLU())
         else:
-            self.conv5 = nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size=ksize, padding=pad, bias=False))
+            self.conv5 = nn.Sequential(
+                nn.Conv2d(
+                    in_channels,
+                    out_channels,
+                    kernel_size=ksize,
+                    padding=pad,
+                    bias=False))
 
     def forward(self, x):
         return self.conv5(x)
@@ -205,5 +226,3 @@ class PredLayer(nn.Module):
 
     def forward(self, x):
         return self.conv5(x)
-
-

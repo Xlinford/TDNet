@@ -45,8 +45,6 @@ class cityscapesLoader(data.Dataset):
 
     label_colours = dict(zip(range(19), colors))
 
-
-
     def __init__(
         self,
         root,
@@ -70,8 +68,8 @@ class cityscapesLoader(data.Dataset):
         self.root = root
         self.split = split
         self.augmentations = augmentations
-        self.test_mode=test_mode
-        self.model_name=model_name
+        self.test_mode = test_mode
+        self.model_name = model_name
         self.n_classes = 19
         self.files = {}
 

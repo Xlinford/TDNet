@@ -22,6 +22,7 @@ def recursive_glob(rootdir=".", suffix=""):
         if filename.endswith(suffix)
     ]
 
+
 def alpha_blend(input_image, segmentation_mask, alpha=0.5):
     """Alpha Blending utility to overlay RGB masks on RBG images
         :param input_image is a np.ndarray with 3 channels
@@ -32,7 +33,8 @@ def alpha_blend(input_image, segmentation_mask, alpha=0.5):
     blended = input_image * alpha + segmentation_mask * (1 - alpha)
     return blended
 
-def split_fanet_dict(state_dict, path_num =None):
+
+def split_fanet_dict(state_dict, path_num=None):
     backbone_state = OrderedDict()
     ffm_32_state = OrderedDict()
     ffm_16_state = OrderedDict()
@@ -51,10 +53,10 @@ def split_fanet_dict(state_dict, path_num =None):
 
         if s_k[0] == 'ffm_16':
             ffm_16_state['.'.join(s_k[1:])] = v
-            
+
         if s_k[0] == 'ffm_8':
             ffm_8_state['.'.join(s_k[1:])] = v
-            
+
         if s_k[0] == 'ffm_4':
             ffm_4_state['.'.join(s_k[1:])] = v
 
@@ -67,7 +69,7 @@ def split_fanet_dict(state_dict, path_num =None):
     return backbone_state, ffm_32_state, ffm_16_state, ffm_8_state, ffm_4_state, output_state, output_aux_state
 
 
-def split_psp_dict(state_dict, path_num =None):
+def split_psp_dict(state_dict, path_num=None):
     """Split a PSPNet model into different part
        :param state_dict is the loaded DataParallel model_state
     """
@@ -92,37 +94,37 @@ def split_psp_dict(state_dict, path_num =None):
                 psp_state['.'.join(pk[2:])] = v
             else:
                 pk[1] = str(int(pk[1]) - 1)
-                if pk[1] == '0':  #Shift channel params
+                if pk[1] == '0':  # Shift channel params
                     o_c, i_c, h_, w_ = v.size()
                     shifted_param_l = []
-                    step1 = i_c//2//path_num
-                    step2 = i_c//8//path_num
+                    step1 = i_c // 2 // path_num
+                    step2 = i_c // 8 // path_num
                     for id in range(path_num):
-                        idx1 = range(id*step1,id*step1+step1)
-                        idx2 = range(i_c*4//8+id*step2,i_c*4//8+id*step2+step2)
-                        idx3 = range(i_c*5//8+id*step2,i_c*5//8+id*step2+step2)
-                        idx4 = range(i_c*6//8+id*step2,i_c*6//8+id*step2+step2)
-                        idx5 = range(i_c*7//8+id*step2,i_c*7//8+id*step2+step2)
-                        shifted_param_l.append(v[:,idx1,:,:])
-                        shifted_param_l.append(v[:,idx2,:,:])
-                        shifted_param_l.append(v[:,idx3,:,:])
-                        shifted_param_l.append(v[:,idx4,:,:])
-                        shifted_param_l.append(v[:,idx5,:,:])
+                        idx1 = range(id * step1, id * step1 + step1)
+                        idx2 = range(i_c * 4 // 8 + id * step2, i_c * 4 // 8 + id * step2 + step2)
+                        idx3 = range(i_c * 5 // 8 + id * step2, i_c * 5 // 8 + id * step2 + step2)
+                        idx4 = range(i_c * 6 // 8 + id * step2, i_c * 6 // 8 + id * step2 + step2)
+                        idx5 = range(i_c * 7 // 8 + id * step2, i_c * 7 // 8 + id * step2 + step2)
+                        shifted_param_l.append(v[:, idx1, :, :])
+                        shifted_param_l.append(v[:, idx2, :, :])
+                        shifted_param_l.append(v[:, idx3, :, :])
+                        shifted_param_l.append(v[:, idx4, :, :])
+                        shifted_param_l.append(v[:, idx5, :, :])
                     v1 = torch.cat(shifted_param_l[:5], dim=1)
                     v2 = torch.cat(shifted_param_l[5:10], dim=1)
-                    if path_num==2:
+                    if path_num == 2:
                         v3 = torch.cat(shifted_param_l[:5], dim=1)
                         v4 = torch.cat(shifted_param_l[5:10], dim=1)
-                    elif path_num==4:
+                    elif path_num == 4:
                         v3 = torch.cat(shifted_param_l[10:15], dim=1)
                         v4 = torch.cat(shifted_param_l[15:20], dim=1)
                     else:
                         raise RuntimeError("Only support 2 or 4 path")
 
-                    head_state1['.'.join(pk)] =v1
-                    head_state2['.'.join(pk)] =v2
-                    head_state3['.'.join(pk)] =v3
-                    head_state4['.'.join(pk)] =v4
+                    head_state1['.'.join(pk)] = v1
+                    head_state2['.'.join(pk)] = v2
+                    head_state3['.'.join(pk)] = v3
+                    head_state4['.'.join(pk)] = v4
                 else:
                     head_state1['.'.join(pk)] = v
                     head_state2['.'.join(pk)] = v
@@ -135,7 +137,7 @@ def split_psp_dict(state_dict, path_num =None):
     return backbone_state, psp_state, head_state1, head_state2, head_state3, head_state4, auxlayer_state
 
 
-def split_psp_state_dict(state_dict, path_num = 4):
+def split_psp_state_dict(state_dict, path_num=4):
     """Split a PSPNet model into different part
        :param state_dict is the loaded DataParallel model_state
     """
@@ -149,7 +151,7 @@ def split_psp_state_dict(state_dict, path_num = 4):
     auxlayer_state = OrderedDict()
 
     for k, v in state_dict.items():
-        
+
         s_k = k.split('.')
         if s_k[0] == 'pretrained':
             backbone_state['.'.join(s_k[1:])] = v
@@ -160,46 +162,47 @@ def split_psp_state_dict(state_dict, path_num = 4):
                 psp_state['.'.join(pk[2:])] = v
             else:
                 pk[1] = str(int(pk[1]) - 1)
-                if pk[1] == '0':  #Shift channel params
+                if pk[1] == '0':  # Shift channel params
                     o_c, i_c, h_, w_ = v.size()
                     shifted_param_l = []
-                    step1 = i_c//2//path_num
-                    step2 = i_c//8//path_num
+                    step1 = i_c // 2 // path_num
+                    step2 = i_c // 8 // path_num
                     for id in range(path_num):
-                        idx1 = range(id*step1,id*step1+step1)
-                        idx2 = range(i_c*4//8+id*step2,i_c*4//8+id*step2+step2)
-                        idx3 = range(i_c*5//8+id*step2,i_c*5//8+id*step2+step2)
-                        idx4 = range(i_c*6//8+id*step2,i_c*6//8+id*step2+step2)
-                        idx5 = range(i_c*7//8+id*step2,i_c*7//8+id*step2+step2)
-                        shifted_param_l.append(v[:,idx1,:,:])
-                        shifted_param_l.append(v[:,idx2,:,:])
-                        shifted_param_l.append(v[:,idx3,:,:])
-                        shifted_param_l.append(v[:,idx4,:,:])
-                        shifted_param_l.append(v[:,idx5,:,:])
+                        idx1 = range(id * step1, id * step1 + step1)
+                        idx2 = range(i_c * 4 // 8 + id * step2, i_c * 4 // 8 + id * step2 + step2)
+                        idx3 = range(i_c * 5 // 8 + id * step2, i_c * 5 // 8 + id * step2 + step2)
+                        idx4 = range(i_c * 6 // 8 + id * step2, i_c * 6 // 8 + id * step2 + step2)
+                        idx5 = range(i_c * 7 // 8 + id * step2, i_c * 7 // 8 + id * step2 + step2)
+                        shifted_param_l.append(v[:, idx1, :, :])
+                        shifted_param_l.append(v[:, idx2, :, :])
+                        shifted_param_l.append(v[:, idx3, :, :])
+                        shifted_param_l.append(v[:, idx4, :, :])
+                        shifted_param_l.append(v[:, idx5, :, :])
                     v1 = torch.cat(shifted_param_l[:5], dim=1)
                     v2 = torch.cat(shifted_param_l[5:10], dim=1)
 
-                    if path_num==2:
+                    if path_num == 2:
                         v3 = torch.cat(shifted_param_l[:5], dim=1)
                         v4 = torch.cat(shifted_param_l[5:10], dim=1)
-                    elif path_num==4:
+                    elif path_num == 4:
                         v3 = torch.cat(shifted_param_l[10:15], dim=1)
                         v4 = torch.cat(shifted_param_l[15:20], dim=1)
                     else:
                         raise RuntimeError("Only support 2 or 4 path")
-                        
-                    grp_state1['.'.join(pk)] =v1
-                    grp_state2['.'.join(pk)] =v2
-                    grp_state3['.'.join(pk)] =v3
-                    grp_state4['.'.join(pk)] =v4
+
+                    grp_state1['.'.join(pk)] = v1
+                    grp_state2['.'.join(pk)] = v2
+                    grp_state3['.'.join(pk)] = v3
+                    grp_state4['.'.join(pk)] = v4
                 else:
                     pk[1] = str(int(pk[1]) - 1)
-                    head_state['.'.join(pk)] =v
+                    head_state['.'.join(pk)] = v
 
         if s_k[0] == 'auxlayer':
             auxlayer_state['.'.join(s_k[1:])] = v
 
     return backbone_state, psp_state, grp_state1, grp_state2, grp_state3, grp_state4, head_state, auxlayer_state
+
 
 def clean_state_dict(state_dict, key=None):
     new_state_dict = OrderedDict()
@@ -207,6 +210,7 @@ def clean_state_dict(state_dict, key=None):
         if k.split('.')[0] != key:  # remove `module.`
             new_state_dict[k] = v
     return new_state_dict
+
 
 def convert_state_dict(state_dict):
     """Converts a state dict saved from a dataParallel module to normal
@@ -218,6 +222,7 @@ def convert_state_dict(state_dict):
         name = k[7:]  # remove `module.`
         new_state_dict[name] = v
     return new_state_dict
+
 
 def get_logger(logdir):
     logger = logging.getLogger("ptsemseg")
